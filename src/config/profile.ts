@@ -8,18 +8,36 @@ export const TrainingProfileSchema = z.object({
   availability: z.record(z.string(), z.union([z.string(), z.array(z.string())])).default({}),
   preferences: z.array(z.string()).default([]),
   injuryContext: z.string().nullable().default(null),
-}).strict();
+  profileVersion: z.number().int().positive().optional(),
+  lastUpdated: z.string().optional(),
+  primarySports: z.array(z.string()).optional(),
+  targetEvents: z.array(z.record(z.string(), z.unknown())).optional(),
+  performanceContext: z.record(z.string(), z.unknown()).optional(),
+  trainingBackground: z.record(z.string(), z.unknown()).optional(),
+  currentContext: z.record(z.string(), z.unknown()).optional(),
+  injuryHistory: z.array(z.record(z.string(), z.unknown())).optional(),
+  coachingGuardrails: z.array(z.string()).optional(),
+  openQuestions: z.array(z.string()).optional(),
+  dataNotes: z.array(z.string()).optional(),
+}).passthrough();
 
 export type TrainingProfile = z.infer<typeof TrainingProfileSchema>;
 
 export async function loadTrainingProfile(pathOrYaml?: string): Promise<TrainingProfile | null> {
   if (!pathOrYaml) return null;
-  let source = pathOrYaml;
+
+  try {
+    const inline = TrainingProfileSchema.safeParse(parse(pathOrYaml));
+    if (inline.success) return inline.data;
+  } catch {
+    // A value that is not valid inline YAML can still be a valid file path.
+  }
+
+  let source: string;
   try {
     source = await readFile(pathOrYaml, "utf8");
   } catch (error) {
-    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-    if (code !== "ENOENT" || !pathOrYaml.includes("\n")) throw error;
+    throw new Error("Training profile is neither valid inline YAML nor a readable file", { cause: error });
   }
   return TrainingProfileSchema.parse(parse(source));
 }

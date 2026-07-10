@@ -25,7 +25,7 @@ describe("neutral workout model and renderer", () => {
           ] },
         ],
       }],
-    }).workouts[0];
+    }).workouts[0]!;
     const rendered = renderWorkout(workout);
     expect(rendered.moving_time).toBe(2520);
     expect(rendered.description).toContain("# clientWorkoutId=w1");

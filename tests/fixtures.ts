@@ -11,6 +11,7 @@ export const testConfig: AppConfig = {
   writeEnabled: false,
   intervalsBaseUrl: "https://example.test/api/v1",
   requestTimeoutMs: 1000,
+  logLevel: "silent",
 };
 
 export class MockIntervalsClient implements IntervalsClientContract {
@@ -20,7 +21,7 @@ export class MockIntervalsClient implements IntervalsClientContract {
   events: IntervalsObject[] = [];
   activity: IntervalsObject = { id: "a1", type: "Run", start_date_local: "2026-07-09T07:00:00" };
   creates: RenderedEvent[] = [];
-  updates: Array<{ id: string; event: RenderedEvent }> = [];
+  updates: { id: string; event: RenderedEvent }[] = [];
 
   async getAthlete() { return this.athlete; }
   async listActivities() { return this.activities; }

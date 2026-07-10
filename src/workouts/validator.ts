@@ -1,38 +1,16 @@
-import { DateTime } from "luxon";
+import type { DateTime } from "luxon";
 import { parseUserDate, today } from "../coaching/dates.js";
-import type { ReturnTypeMapEvent } from "./validator-types.js";
+import type { CalendarEvent } from "../calendar/model.js";
+import type { PlanSummary, ValidationIssue, ValidationResult } from "./contracts.js";
+import type { SportZoneCapabilities, ZoneCapabilities } from "./capabilities.js";
 import { TrainingPlanSchema, type TrainingPlan, type WorkoutStep } from "./model.js";
 import { totalDistance, totalDuration } from "./renderer.js";
 import type { ValidationTokenSigner } from "./token.js";
 
-export interface ValidationIssue {
-  code: string;
-  message: string;
-  path?: string;
-  workoutId?: string;
-}
-
-export interface PlanSummary {
-  workoutCount: number;
-  totalDurationSeconds: number;
-  totalDistanceMeters: number;
-  byWeek: Array<{ weekStart: string; workouts: number; durationSeconds: number; distanceMeters: number }>;
-}
-
-export interface ValidationResult {
-  valid: boolean;
-  normalizedPlan: TrainingPlan | null;
-  errors: ValidationIssue[];
-  warnings: ValidationIssue[];
-  summary: PlanSummary;
-  humanReadablePreview: string;
-  validationToken?: string;
-}
-
 export interface ValidationContext {
   timezone: string;
-  zonesAvailable?: boolean;
-  existingEvents?: ReturnTypeMapEvent[];
+  zoneCapabilities?: ZoneCapabilities;
+  existingEvents?: CalendarEvent[];
   signer?: ValidationTokenSigner;
   now?: DateTime;
 }
@@ -41,8 +19,14 @@ function emptySummary(): PlanSummary {
   return { workoutCount: 0, totalDurationSeconds: 0, totalDistanceMeters: 0, byWeek: [] };
 }
 
-function hasZoneTarget(steps: WorkoutStep[]): boolean {
-  return steps.some((step) => step.type === "repeat" ? hasZoneTarget(step.steps) : step.target.type.endsWith("_zone"));
+function requiredZoneTypes(steps: WorkoutStep[]): (keyof SportZoneCapabilities)[] {
+  return steps.flatMap((step) => {
+    if (step.type === "repeat") return requiredZoneTypes(step.steps);
+    if (step.target.type === "heart_rate_zone") return ["heartRate" as const];
+    if (step.target.type === "pace_zone") return ["pace" as const];
+    if (step.target.type === "power_zone") return ["power" as const];
+    return [];
+  });
 }
 
 function isHard(steps?: WorkoutStep[]): boolean {
@@ -124,8 +108,15 @@ export function validateTrainingPlan(input: unknown, context: ValidationContext)
       errors.push({ code: "duplicate_workout", message: "Duplicate workout date and name", workoutId: workout.clientWorkoutId });
     }
     seenDatesAndNames.add(dateName);
-    if (workout.steps && hasZoneTarget(workout.steps) && context.zonesAvailable === false) {
-      errors.push({ code: "missing_zones", message: "Workout uses zone targets but Intervals.icu zones are unavailable", workoutId: workout.clientWorkoutId });
+    const unavailableZones = workout.steps
+      ? [...new Set(requiredZoneTypes(workout.steps))].filter((type) => context.zoneCapabilities?.[workout.sport]?.[type] !== true)
+      : [];
+    if (unavailableZones.length > 0) {
+      errors.push({
+        code: "missing_zones",
+        message: `Workout uses unavailable ${unavailableZones.join(", ")} zones for ${workout.sport}`,
+        workoutId: workout.clientWorkoutId,
+      });
     }
     const collisions = context.existingEvents?.filter((event) => event.date.slice(0, 10) === workout.date && event.clientWorkoutId !== workout.clientWorkoutId) ?? [];
     if (collisions.length > 0) {
@@ -134,8 +125,8 @@ export function validateTrainingPlan(input: unknown, context: ValidationContext)
   }
 
   for (let index = 1; index < normalizedPlan.workouts.length; index += 1) {
-    const previous = normalizedPlan.workouts[index - 1];
-    const current = normalizedPlan.workouts[index];
+    const previous = normalizedPlan.workouts[index - 1]!;
+    const current = normalizedPlan.workouts[index]!;
     if (current.date === previous.date && current.sport !== "recovery" && previous.sport !== "recovery") {
       warnings.push({ code: "multiple_hard_same_day", message: "Multiple non-recovery workouts on the same day", workoutId: current.clientWorkoutId });
     }
@@ -147,8 +138,8 @@ export function validateTrainingPlan(input: unknown, context: ValidationContext)
 
   const summary = summarize(normalizedPlan, context.timezone);
   for (let index = 1; index < summary.byWeek.length; index += 1) {
-    const prior = summary.byWeek[index - 1].durationSeconds;
-    const current = summary.byWeek[index].durationSeconds;
+    const prior = summary.byWeek[index - 1]!.durationSeconds;
+    const current = summary.byWeek[index]!.durationSeconds;
     if (prior > 0 && current > prior * 1.25) {
       warnings.push({ code: "weekly_volume_jump", message: "Planned weekly duration increases by more than 25%" });
     }

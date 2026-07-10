@@ -1,31 +1,36 @@
-import { z } from "zod";
+import type { z } from "zod";
 import {
   ActivityListResponseSchema, ActivityResponseSchema, AthleteResponseSchema, EventListResponseSchema,
-  EventWriteResponseSchema, WellnessListResponseSchema, type IntervalsObject,
+  EventWriteResponseSchema, WellnessListResponseSchema, type ActivityResponse, type AthleteResponse,
+  type EventResponse, type WellnessResponse,
 } from "./schemas.js";
 import type { RenderedEvent } from "../workouts/renderer.js";
+import { AppError } from "../platform/errors.js";
 
-export class IntervalsApiError extends Error {
+export class IntervalsApiError extends AppError {
   constructor(
     public readonly status: number,
     public readonly kind: "unauthorized" | "forbidden" | "not_found" | "rate_limited" | "upstream" | "invalid_response" | "network",
     message: string,
     public readonly retryable: boolean,
   ) {
-    super(message);
+    super("UPSTREAM_UNAVAILABLE", "Intervals.icu is temporarily unavailable");
+    this.message = message;
     this.name = "IntervalsApiError";
   }
 }
 
-export interface IntervalsClientContract {
-  getAthlete(): Promise<IntervalsObject>;
-  listActivities(startDate: string, endDate: string): Promise<IntervalsObject[]>;
-  getActivity(activityId: string, includeIntervals?: boolean): Promise<IntervalsObject>;
-  listWellness(startDate: string, endDate: string): Promise<IntervalsObject[]>;
-  listEvents(startDate: string, endDate: string): Promise<IntervalsObject[]>;
-  createEvent(event: RenderedEvent): Promise<IntervalsObject>;
-  updateEvent(eventId: string, event: RenderedEvent): Promise<IntervalsObject>;
+export interface IntervalsGateway {
+  getAthlete(): Promise<AthleteResponse>;
+  listActivities(startDate: string, endDate: string): Promise<ActivityResponse[]>;
+  getActivity(activityId: string, includeIntervals?: boolean): Promise<ActivityResponse>;
+  listWellness(startDate: string, endDate: string): Promise<WellnessResponse[]>;
+  listEvents(startDate: string, endDate: string): Promise<EventResponse[]>;
+  createEvent(event: RenderedEvent): Promise<EventResponse>;
+  updateEvent(eventId: string, event: RenderedEvent): Promise<EventResponse>;
 }
+
+export type IntervalsClientContract = IntervalsGateway;
 
 export interface IntervalsClientOptions {
   baseUrl: string;
@@ -44,7 +49,7 @@ function kindForStatus(status: number): IntervalsApiError["kind"] {
   return "upstream";
 }
 
-export class IntervalsClient implements IntervalsClientContract {
+export class IntervalsClient implements IntervalsGateway {
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly timeoutMs: number;
