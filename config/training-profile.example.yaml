@@ -1,0 +1,16 @@
+goals:
+  - "Build durable aerobic fitness"
+  - "Prepare for a target race"
+experience: "Intermediate endurance athlete"
+availability:
+  monday: "45 minutes"
+  tuesday: "60 minutes"
+  wednesday: "Rest"
+  thursday: "60 minutes"
+  friday: "45 minutes"
+  saturday: "Up to 2 hours"
+  sunday: "Up to 90 minutes"
+preferences:
+  - "Prefer hard sessions on Tuesday and Saturday"
+  - "Keep one full rest day each week"
+injuryContext: null
