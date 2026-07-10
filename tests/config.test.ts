@@ -40,6 +40,16 @@ describe("environment configuration", () => {
       preferences: ["morning"],
     });
   });
+
+  it("prefers inline training profile YAML over a local file path", () => {
+    const config = loadConfig({
+      ...authEnv,
+      TRAINING_PROFILE_PATH: "./config/training-profile.yaml",
+      TRAINING_PROFILE_YAML: "goals: [Deploy on Railway]",
+    });
+
+    expect(config.trainingProfileSource).toBe("goals: [Deploy on Railway]");
+  });
 });
 
 describe("training profile configuration", () => {

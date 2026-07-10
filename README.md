@@ -44,7 +44,7 @@ LOG_LEVEL=info
 
 Wygeneruj osobny token dostępu, na przykład `openssl rand -hex 32`. Klient MCP musi wysyłać go w każdym żądaniu jako nagłówek `Authorization: Bearer <token>`. Brakujący, niepoprawnie sformatowany lub błędny token zawsze zwraca `401` bez ujawnienia przyczyny.
 
-`TRAINING_PROFILE_PATH` wskazuje prywatny plik YAML. Alternatywnie `TRAINING_PROFILE_YAML` może zawierać YAML bezpośrednio; dla zgodności wstecznej nadal akceptuje również ścieżkę. Prawdziwy profil i `.env` są ignorowane przez Git i obraz Dockera. Strefy, FTP, FTHR i masa są pobierane z Intervals.icu, nie z profilu.
+`TRAINING_PROFILE_PATH` wskazuje prywatny plik YAML i jest przeznaczone głównie do uruchamiania lokalnego. Na platformach wdrożeniowych `TRAINING_PROFILE_YAML` może zawierać pełny, wielowierszowy YAML bezpośrednio i ma pierwszeństwo, jeśli ustawione są obie zmienne. Dla zgodności wstecznej loader nadal akceptuje również ścieżkę przekazaną jako źródło profilu. Prawdziwy profil i `.env` są ignorowane przez Git i obraz Dockera. Strefy, FTP, FTHR i masa są pobierane z Intervals.icu, nie z profilu.
 
 Przy włączeniu zapisu ustaw losowy sekret o długości co najmniej 32 znaków, np. `openssl rand -hex 32`. Najpierw wywołaj `validate_training_plan`, a do `apply_training_plan` przekaż dokładnie zwrócony `normalizedPlan` i `validationToken`. Token wygasa po 5 minutach i jest związany z kanonicznym hashem całego planu.
 
@@ -134,7 +134,7 @@ Proces nasłuchuje na `0.0.0.0` i porcie z `PORT`. Obraz działa jako nieuprzywi
 
 ## Railway
 
-Repozytorium zawiera `Dockerfile`, więc Railway może użyć buildera Dockerfile. Utwórz prywatną usługę z repozytorium i ustaw zmienne z `.env.example`; `PORT` może pozostać zarządzany przez Railway. Dla profilu najwygodniej umieścić wielowierszowy YAML bezpośrednio w prywatnej zmiennej `TRAINING_PROFILE_YAML`.
+Repozytorium zawiera `Dockerfile`, więc Railway może użyć buildera Dockerfile. Utwórz prywatną usługę z repozytorium i ustaw zmienne z `.env.example`; `PORT` może pozostać zarządzany przez Railway. Nie ustawiaj tam lokalnego `TRAINING_PROFILE_PATH`. Zamiast tego wklej pełną zawartość profilu jako wielowierszową wartość prywatnej zmiennej `TRAINING_PROFILE_YAML` w panelu Railway. Profil nie musi wtedy znajdować się w repozytorium ani w obrazie.
 
 Ustaw token jako prywatną zmienną Railway, na przykład:
 

@@ -50,7 +50,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     apiKey: parsed.INTERVALS_ICU_API_KEY,
     athleteId: parsed.INTERVALS_ICU_ATHLETE_ID,
     timezone: parsed.USER_TIMEZONE,
-    trainingProfileSource: parsed.TRAINING_PROFILE_PATH ?? parsed.TRAINING_PROFILE_YAML,
+    // Inline YAML is deployment-friendly and must win when a local path is also
+    // present (for example after copying .env.example to Railway variables).
+    trainingProfileSource: parsed.TRAINING_PROFILE_YAML ?? parsed.TRAINING_PROFILE_PATH,
     writeEnabled: parsed.WRITE_ENABLED === "true",
     validationSecret: parsed.VALIDATION_HMAC_SECRET,
     intervalsBaseUrl: parsed.INTERVALS_ICU_BASE_URL.replace(/\/$/, ""),
