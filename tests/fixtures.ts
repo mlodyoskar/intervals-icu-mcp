@@ -3,8 +3,11 @@ import type { IntervalsClientContract } from "../src/intervals/client.js";
 import type { IntervalsObject } from "../src/intervals/schemas.js";
 import type { RenderedEvent } from "../src/workouts/renderer.js";
 
+export const testAuthToken = "test-auth-token-with-at-least-32-characters";
+
 export const testConfig: AppConfig = {
   port: 0,
+  mcpAuthToken: testAuthToken,
   apiKey: "test-key",
   athleteId: "i-test",
   timezone: "Europe/Warsaw",

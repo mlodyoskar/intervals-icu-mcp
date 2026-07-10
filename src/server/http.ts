@@ -10,12 +10,12 @@ import type { TrainingProfile } from "../config/profile.js";
 import type { IntervalsClientContract } from "../intervals/client.js";
 import { createMcpServer } from "../tools/register.js";
 import { createLogger, type AppLogger } from "../platform/logger.js";
+import { createBearerAuthMiddleware } from "./auth.js";
 
 export interface HttpServerDependencies {
   config: AppConfig;
   client: IntervalsClientContract;
   profile: TrainingProfile | null;
-  authMiddleware?: RequestHandler;
   logger?: AppLogger;
 }
 
@@ -37,7 +37,7 @@ export function createHttpApp(dependencies: HttpServerDependencies) {
     },
     wrapSerializers: false,
   }) as RequestHandler);
-  if (dependencies.authMiddleware) app.use("/mcp", dependencies.authMiddleware);
+  app.use("/mcp", createBearerAuthMiddleware(dependencies.config.mcpAuthToken));
 
   app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok" }));
   app.get("/readyz", (_req, res) => {

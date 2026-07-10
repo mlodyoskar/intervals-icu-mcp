@@ -16,7 +16,7 @@ Serwer używa Streamable HTTP z MCP SDK 1.29.0:
 
 ## Bezpieczeństwo
 
-Zapis jest domyślnie wyłączony. Nie wystawiaj serwera publicznie z prywatnymi danymi zdrowotnymi bez uwierzytelnienia. Obecna fabryka HTTP przyjmuje middleware uwierzytelniający przed `/mcp`, co pozwala później dodać OAuth 2.1 bez zmiany narzędzi ani klienta Intervals.
+Zapis jest domyślnie wyłączony. Wszystkie metody `/mcp` wymagają statycznego tokenu Bearer z `MCP_AUTH_TOKEN`; proces nie uruchomi się bez tokenu o długości co najmniej 32 znaków. Porównanie tokenów jest wykonywane w stałym czasie, a `/healthz` i `/readyz` pozostają publiczne wyłącznie na potrzeby sond platformy.
 
 Serwer nie loguje argumentów narzędzi, odpowiedzi Intervals, klucza API ani treści błędów upstream. `apply_training_plan` pojawia się wyłącznie przy `WRITE_ENABLED=true` i wymaga krótkotrwałego tokenu HMAC otrzymanego z `validate_training_plan`.
 
@@ -32,6 +32,7 @@ Uzupełnij `.env`:
 
 ```dotenv
 PORT=3000
+MCP_AUTH_TOKEN=...
 INTERVALS_ICU_API_KEY=...
 INTERVALS_ICU_ATHLETE_ID=i12345
 USER_TIMEZONE=Europe/Warsaw
@@ -40,6 +41,8 @@ WRITE_ENABLED=false
 VALIDATION_HMAC_SECRET=
 LOG_LEVEL=info
 ```
+
+Wygeneruj osobny token dostępu, na przykład `openssl rand -hex 32`. Klient MCP musi wysyłać go w każdym żądaniu jako nagłówek `Authorization: Bearer <token>`. Brakujący, niepoprawnie sformatowany lub błędny token zawsze zwraca `401` bez ujawnienia przyczyny.
 
 `TRAINING_PROFILE_PATH` wskazuje prywatny plik YAML. Alternatywnie `TRAINING_PROFILE_YAML` może zawierać YAML bezpośrednio; dla zgodności wstecznej nadal akceptuje również ścieżkę. Prawdziwy profil i `.env` są ignorowane przez Git i obraz Dockera. Strefy, FTP, FTHR i masa są pobierane z Intervals.icu, nie z profilu.
 
@@ -65,7 +68,13 @@ curl http://localhost:3000/healthz
 curl http://localhost:3000/readyz
 ```
 
-Adres MCP do konfiguracji własnej aplikacji: `http://localhost:3000/mcp`. W środowisku publicznym używaj wyłącznie HTTPS i OAuth 2.1.
+Adres MCP do konfiguracji własnej aplikacji: `http://localhost:3000/mcp`. W środowisku publicznym używaj wyłącznie HTTPS i przekazuj token Bearer tylko z zaufanego klienta.
+
+Przykładowy nagłówek klienta:
+
+```text
+Authorization: Bearer <wartość MCP_AUTH_TOKEN>
+```
 
 ## Narzędzia MCP
 
@@ -127,6 +136,12 @@ Proces nasłuchuje na `0.0.0.0` i porcie z `PORT`. Obraz działa jako nieuprzywi
 
 Repozytorium zawiera `Dockerfile`, więc Railway może użyć buildera Dockerfile. Utwórz prywatną usługę z repozytorium i ustaw zmienne z `.env.example`; `PORT` może pozostać zarządzany przez Railway. Dla profilu najwygodniej umieścić wielowierszowy YAML bezpośrednio w prywatnej zmiennej `TRAINING_PROFILE_YAML`.
 
+Ustaw token jako prywatną zmienną Railway, na przykład:
+
+```bash
+railway variable set MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+```
+
 Po wdrożeniu sprawdź `https://<domain>/healthz` i `https://<domain>/readyz`, a adres aplikacji MCP ustaw na `https://<domain>/mcp`. Nie ustawiaj `WRITE_ENABLED=true`, dopóki nie skonfigurujesz `VALIDATION_HMAC_SECRET` i nie zweryfikujesz przepływu na środowisku prywatnym.
 
-Publiczne wdrożenie wymaga przed `/mcp` middleware OAuth 2.1 oraz HTTPS. Same endpointy health/readiness nie ujawniają danych zdrowotnych ani sekretów.
+Railway kończy publiczne połączenie HTTPS, a aplikacja wewnątrz platformy nadal nasłuchuje przez HTTP. Same endpointy health/readiness nie ujawniają danych zdrowotnych ani sekretów. Przy rotacji tokenu ustaw nową wartość `MCP_AUTH_TOKEN`, pozwól Railway ponownie wdrożyć usługę, a następnie zaktualizuj konfigurację klienta. Serwer celowo akceptuje tylko jeden aktywny token.
