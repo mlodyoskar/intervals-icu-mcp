@@ -11,8 +11,11 @@ const optionalSecret = z.preprocess(
   z.string().min(32).optional(),
 );
 
+const requiredSecret = z.string().trim().min(32).regex(/^\S+$/, "Expected a token without whitespace");
+
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  MCP_AUTH_TOKEN: requiredSecret,
   INTERVALS_ICU_API_KEY: optionalNonEmptyString,
   INTERVALS_ICU_ATHLETE_ID: optionalNonEmptyString,
   USER_TIMEZONE: z.string().refine((value) => IANAZone.isValidZone(value), "Expected a valid IANA timezone").default("Europe/Warsaw"),
@@ -27,6 +30,7 @@ const EnvSchema = z.object({
 
 export interface AppConfig {
   port: number;
+  mcpAuthToken: string;
   apiKey?: string;
   athleteId?: string;
   timezone: string;
@@ -42,6 +46,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
   return {
     port: parsed.PORT,
+    mcpAuthToken: parsed.MCP_AUTH_TOKEN,
     apiKey: parsed.INTERVALS_ICU_API_KEY,
     athleteId: parsed.INTERVALS_ICU_ATHLETE_ID,
     timezone: parsed.USER_TIMEZONE,

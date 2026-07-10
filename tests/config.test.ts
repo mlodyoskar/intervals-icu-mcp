@@ -3,8 +3,11 @@ import { loadConfig, readinessProblems } from "../src/config/env.js";
 import { loadTrainingProfile } from "../src/config/profile.js";
 
 describe("environment configuration", () => {
+  const authEnv = { MCP_AUTH_TOKEN: "test-auth-token-with-at-least-32-characters" };
+
   it("treats empty optional .env values as unset", () => {
     const config = loadConfig({
+      ...authEnv,
       INTERVALS_ICU_API_KEY: "",
       INTERVALS_ICU_ATHLETE_ID: "",
       TRAINING_PROFILE_YAML: "",
@@ -19,12 +22,19 @@ describe("environment configuration", () => {
   });
 
   it("requires a strong secret only when a non-empty secret is supplied", () => {
-    expect(() => loadConfig({ WRITE_ENABLED: "false", VALIDATION_HMAC_SECRET: "short" })).toThrow();
-    expect(() => loadConfig({ WRITE_ENABLED: "false", VALIDATION_HMAC_SECRET: "" })).not.toThrow();
+    expect(() => loadConfig({ ...authEnv, WRITE_ENABLED: "false", VALIDATION_HMAC_SECRET: "short" })).toThrow();
+    expect(() => loadConfig({ ...authEnv, WRITE_ENABLED: "false", VALIDATION_HMAC_SECRET: "" })).not.toThrow();
+  });
+
+  it("requires a strong MCP authentication token", () => {
+    expect(() => loadConfig({})).toThrow();
+    expect(() => loadConfig({ MCP_AUTH_TOKEN: "" })).toThrow();
+    expect(() => loadConfig({ MCP_AUTH_TOKEN: "short" })).toThrow();
+    expect(loadConfig({ MCP_AUTH_TOKEN: "x".repeat(32) }).mcpAuthToken).toBe("x".repeat(32));
   });
 
   it("validates timezones and accepts single-line inline training profile YAML", async () => {
-    expect(() => loadConfig({ USER_TIMEZONE: "Mars/Olympus_Mons" })).toThrow();
+    expect(() => loadConfig({ ...authEnv, USER_TIMEZONE: "Mars/Olympus_Mons" })).toThrow();
     await expect(loadTrainingProfile("{ goals: [finish a 10k], preferences: [morning] }")).resolves.toMatchObject({
       goals: ["finish a 10k"],
       preferences: ["morning"],

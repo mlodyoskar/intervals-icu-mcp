@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createHttpApp } from "../src/server/http.js";
-import { MockIntervalsClient, testConfig } from "./fixtures.js";
+import { MockIntervalsClient, testAuthToken, testConfig } from "./fixtures.js";
 
 describe("Streamable HTTP MCP contract", () => {
   const closers: (() => Promise<void>)[] = [];
@@ -23,7 +23,9 @@ describe("Streamable HTTP MCP contract", () => {
     expect((await fetch(`${base}/readyz`)).status).toBe(200);
 
     const client = new Client({ name: "contract-test", version: "1.0.0" });
-    const transport = new StreamableHTTPClientTransport(new URL(`${base}/mcp`));
+    const transport = new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+      requestInit: { headers: { Authorization: `Bearer ${testAuthToken}` } },
+    });
     await client.connect(transport);
     closers.push(async () => { await client.close().catch(() => undefined); });
     const tools = await client.listTools();
@@ -111,7 +113,9 @@ describe("Streamable HTTP MCP contract", () => {
     closers.push(() => new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve())));
     const port = (httpServer.address() as AddressInfo).port;
     const client = new Client({ name: "contract-test", version: "1.0.0" });
-    const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`));
+    const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
+      requestInit: { headers: { Authorization: `Bearer ${testAuthToken}` } },
+    });
     await client.connect(transport);
     closers.push(async () => { await client.close().catch(() => undefined); });
 
@@ -129,5 +133,40 @@ describe("Streamable HTTP MCP contract", () => {
       sort: "date_desc",
       nextCursor: null,
     } });
+  });
+
+  it("protects every MCP method while leaving health probes public", async () => {
+    const app = createHttpApp({ config: testConfig, client: new MockIntervalsClient(), profile: null });
+    const httpServer = await new Promise<ReturnType<typeof app.listen>>((resolve) => {
+      const server = app.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    closers.push(() => new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve())));
+    const port = (httpServer.address() as AddressInfo).port;
+    const base = `http://127.0.0.1:${port}`;
+
+    await expect(fetch(`${base}/healthz`).then((response) => response.status)).resolves.toBe(200);
+    await expect(fetch(`${base}/readyz`).then((response) => response.status)).resolves.toBe(200);
+
+    for (const method of ["GET", "DELETE", "PUT", "PATCH"]) {
+      const response = await fetch(`${base}/mcp`, { method });
+      expect(response.status).toBe(401);
+      expect(response.headers.get("www-authenticate")).toBe('Bearer realm="intervals-icu-mcp"');
+    }
+
+    for (const authorization of [undefined, "Basic credentials", "Bearer wrong-token"]) {
+      const response = await fetch(`${base}/mcp`, {
+        method: "POST",
+        headers: authorization ? { Authorization: authorization } : undefined,
+      });
+      expect(response.status).toBe(401);
+      expect(response.headers.get("www-authenticate")).toBe('Bearer realm="intervals-icu-mcp"');
+      await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
+    }
+
+    const authenticatedUnsupportedMethod = await fetch(`${base}/mcp`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${testAuthToken}` },
+    });
+    expect(authenticatedUnsupportedMethod.status).toBe(405);
   });
 });
