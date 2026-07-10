@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { IntervalsApiError, IntervalsClient } from "../src/intervals/client.js";
 
 function makeClient(fetchImpl: typeof fetch) {
-  return new IntervalsClient({ baseUrl: "https://example.test/api/v1", apiKey: "secret", athleteId: "i1", fetchImpl, sleep: async () => {} });
+  return new IntervalsClient({ baseUrl: "https://example.test/api/v1", apiKey: "secret", athleteId: "i1", fetchImpl, sleep: () => Promise.resolve() });
 }
 
 describe("Intervals client", () => {
@@ -19,7 +19,7 @@ describe("Intervals client", () => {
     const promise = makeClient(fetchMock as typeof fetch).createEvent({
       start_date_local: "2026-07-11", name: "Easy", type: "Run", category: "WORKOUT", description: "private",
     });
-    await expect(promise).rejects.toMatchObject<Partial<IntervalsApiError>>({ status: 500, kind: "upstream" });
+    await expect(promise).rejects.toMatchObject({ status: 500, kind: "upstream" } satisfies Partial<IntervalsApiError>);
     await expect(promise).rejects.not.toThrow("secret health payload");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

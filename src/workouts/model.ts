@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { IsoDateSchema } from "../coaching/dates.js";
 
-export const SportSchema = z.enum(["run", "ride", "strength"]);
 export const PlanSportSchema = z.enum(["run", "ride", "strength", "recovery"]);
 
-export const TargetSchema = z.discriminatedUnion("type", [
+const TargetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("open") }).strict(),
   z.object({ type: z.enum(["heart_rate_zone", "pace_zone", "power_zone"]), zone: z.number().int().min(1).max(7) }).strict(),
   z.object({ type: z.enum(["heart_rate_range", "pace_range", "power_range"]), min: z.number().positive(), max: z.number().positive() }).strict()
@@ -29,7 +28,7 @@ export type WorkoutStep = z.infer<typeof TimedStepSchema> | {
   steps: WorkoutStep[];
 };
 
-export const WorkoutStepSchema: z.ZodType<WorkoutStep> = z.lazy(() => z.union([
+const WorkoutStepSchema: z.ZodType<WorkoutStep> = z.lazy(() => z.union([
   TimedStepSchema,
   z.object({
     type: z.literal("repeat"),
@@ -38,7 +37,7 @@ export const WorkoutStepSchema: z.ZodType<WorkoutStep> = z.lazy(() => z.union([
   }).strict(),
 ]));
 
-export const WorkoutSchema = z.object({
+const WorkoutSchema = z.object({
   clientWorkoutId: z.string().min(1).max(100).regex(/^[A-Za-z0-9._:-]+$/),
   date: IsoDateSchema,
   sport: PlanSportSchema,

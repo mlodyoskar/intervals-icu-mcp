@@ -1,13 +1,17 @@
 import type { IntervalsClientContract } from "../intervals/client.js";
 import { mapEvent } from "../intervals/mappers.js";
 import { mapAthlete } from "../intervals/mappers.js";
+import { AppError } from "../platform/errors.js";
 import { stableHash } from "./hash.js";
 import type { TrainingPlan } from "./model.js";
 import { renderWorkout } from "./renderer.js";
 import type { ValidationTokenSigner } from "./token.js";
 import { validateTrainingPlan } from "./validator.js";
+import { zoneCapabilitiesFromAthlete } from "./capabilities.js";
+import type { ApplyResult } from "./contracts.js";
+import type { EventResponse } from "../intervals/schemas.js";
 
-export interface ApplyResultItem {
+interface ApplyResultItem {
   clientWorkoutId: string;
   status: "created" | "updated" | "unchanged" | "conflict" | "failed";
   eventId: string | null;
@@ -15,7 +19,7 @@ export interface ApplyResultItem {
   message: string;
 }
 
-function currentWriteShape(raw: Record<string, unknown>) {
+function currentWriteShape(raw: EventResponse) {
   return {
     start_date_local: String(raw.start_date_local ?? raw.start_date ?? "").slice(0, 10),
     name: String(raw.name ?? ""),
@@ -33,22 +37,25 @@ export async function applyTrainingPlan(options: {
   client: IntervalsClientContract;
   signer: ValidationTokenSigner;
   timezone: string;
-}): Promise<{ partial: boolean; results: ApplyResultItem[] }> {
+}): Promise<ApplyResult> {
   const token = options.signer.verify(options.validationToken, options.plan);
-  if (!token.valid) throw new Error(token.reason);
+  if (!token.valid) {
+    throw new AppError(token.reason === "Validation token expired" ? "TOKEN_EXPIRED" : "TOKEN_INVALID", token.reason ?? "Invalid validation token");
+  }
 
   const dates = options.plan.workouts.map((workout) => workout.date).sort();
   const [existingRaw, athleteRaw] = await Promise.all([
-    dates.length ? options.client.listEvents(dates[0], dates[dates.length - 1]) : Promise.resolve([]),
+    dates.length ? options.client.listEvents(dates[0]!, dates[dates.length - 1]!) : Promise.resolve([]),
     options.client.getAthlete(),
   ]);
   const existing = existingRaw.map((raw) => ({ raw, mapped: mapEvent(raw) }));
+  const athlete = mapAthlete(athleteRaw);
   const validation = validateTrainingPlan(options.plan, {
     timezone: options.timezone,
-    zonesAvailable: mapAthlete(athleteRaw).zones !== null,
+    zoneCapabilities: zoneCapabilitiesFromAthlete(athlete),
     existingEvents: existing.map(({ mapped }) => mapped),
   });
-  if (!validation.valid) throw new Error("Plan no longer passes validation");
+  if (!validation.valid) throw new AppError("PLAN_CHANGED", "Plan no longer passes validation");
 
   const results: ApplyResultItem[] = [];
   for (const workout of options.plan.workouts) {
