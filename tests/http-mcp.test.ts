@@ -28,6 +28,7 @@ describe("Streamable HTTP MCP contract", () => {
     });
     await client.connect(transport);
     closers.push(async () => { await client.close().catch(() => undefined); });
+    expect(client.getInstructions()).toContain("call 'get_training_context' first");
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name)).toContain("get_training_context");
     expect(tools.tools.map((tool) => tool.name)).not.toContain("apply_training_plan");
@@ -62,6 +63,10 @@ describe("Streamable HTTP MCP contract", () => {
       },
     });
     const trainingContext = tools.tools.find((tool) => tool.name === "get_training_context");
+    expect(trainingContext).toMatchObject({
+      title: "Training context (Use First)",
+      description: expect.stringContaining("Mandatory first step"),
+    });
     expect(trainingContext?.inputSchema).toMatchObject({
       properties: { includeRawZones: { type: "boolean", default: false } },
     });

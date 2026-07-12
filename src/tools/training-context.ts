@@ -17,8 +17,8 @@ const GetTrainingContextInputSchema = z.object({
 
 export function registerTrainingContextTool(server: McpServer, dependencies: ToolDependencies) {
   server.registerTool("get_training_context", {
-    title: "Get training context",
-    description: "Return a compact, normalized coaching context with sport thresholds/zones, training load state, data coverage and upcoming calendar; raw sport settings are opt-in.",
+    title: "Training context (Use First)",
+    description: "Mandatory first step for every training recommendation, plan, or calendar change. Call this tool before reasoning about workouts. Returns the compact, normalized context needed to make an informed plan; raw sport settings are opt-in.",
     inputSchema: GetTrainingContextInputSchema,
     outputSchema: envelope(TrainingContextSchema),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
